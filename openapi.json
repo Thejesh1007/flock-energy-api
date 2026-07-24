@@ -1,0 +1,103 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Flock Energy — Urja Meter Ops API",
+    "version": "1.0.0",
+    "description": "A clean REST API wrapper around the legacy Urja Meter Ops portal. Session/auth with the portal is handled automatically behind the scenes."
+  },
+  "servers": [{ "url": "http://localhost:4000" }],
+  "paths": {
+    "/api/v1/meters": {
+      "get": {
+        "summary": "List or search meters",
+        "parameters": [
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Search by meter number or serial" },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of meters",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": [
+                    { "meterId": "J100000", "serialNo": "SE33962", "make": "HPL", "phaseType": "single", "installStatus": "Decommissioned", "dtCode": "DT-001" }
+                  ],
+                  "total": 403,
+                  "page": 1,
+                  "pageSize": 20
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/meters/{id}": {
+      "get": {
+        "summary": "Get a single meter's details",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "example": "J100000" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Meter details",
+            "content": {
+              "application/json": {
+                "example": { "meterId": "J100000", "serialNo": "SE33962", "make": "HPL", "phaseType": "single", "installStatus": "Decommissioned", "dtCode": "DT-001" }
+              }
+            }
+          },
+          "404": { "description": "Meter not found" }
+        }
+      }
+    },
+    "/api/v1/meters/{id}/consumption": {
+      "get": {
+        "summary": "Get a meter's consumption history",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "example": "J100000" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consumption readings, normalized to ISO timestamps and numeric values",
+            "content": {
+              "application/json": {
+                "example": {
+                  "meterId": "J100000",
+                  "readings": [
+                    { "timestamp": "2026-06-23T23:30:00.000Z", "kwh": 48438.74, "kvah": 52313.84, "voltageR": 226 }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/transformers": {
+      "get": {
+        "summary": "List distribution transformers",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of transformers",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": [
+                    { "dtCode": "DT-001", "name": "Malviya Nagar DT 1", "feeder": "F-001", "capacityKva": 100 }
+                  ],
+                  "total": 20,
+                  "page": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
