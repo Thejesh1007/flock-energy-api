@@ -1,16 +1,43 @@
-# Reflection
 
-**What assumptions did you make?**
-I assumed the portal's `search` endpoint could double as a single-meter lookup since there was no separate endpoint for it, and that a 401/403 mid-session meant the session had expired and a fresh login would fix it (I couldn't wait a full hour to test true expiry, but it's reasonable given the cookie's 1-hour Max-Age).
+# Implementation Reflection
 
-**Which part was the most difficult, and how did you get unstuck?**
-Login kept failing with a 403 even though the email/password and payload format matched DevTools exactly. It turned out the portal likely checks `Origin`/`Referer`/`User-Agent` headers, which a browser sends automatically but a script doesn't. Adding those headers explicitly fixed it.
+## What assumptions did you make?
 
-**If you had another day, what would you improve?**
-I'd build the full network hierarchy reconstruction (scraping the breadcrumb off each meter's detail page) and add a caching layer, since consumption history payloads are large and don't need to be fetched fresh on every single request.
+- I treated the portal's meter-search endpoint as the source for individual meter details because it supports searching by meter ID. The API checks the returned records for an exact `meterId` match before returning a meter.
+- I assume timestamps from the portal that do not specify a timezone represent UTC. This makes normalization deterministic across machines, but the portal's actual timezone should be verified before using the values for billing or other timezone-sensitive decisions.
+- I treat an upstream portal failure as a gateway error rather than returning the portal's response directly. This keeps the public API's error behavior more consistent.
 
-**What mistake did you make while solving this (there's always one)?**
-I initially placed `openapi.json` one folder level too high (outside the project instead of next to `package.json`), which crashed the server with a "module not found" error until I moved it into the right place.
+## What was the most difficult part?
 
-**If you were reviewing your own submission, what would you criticise?**
-There's no automated testing at all, and the hierarchy/caching extensions are missing. Under time pressure I prioritized a correct, well-documented core over breadth, but a reviewer would fairly flag the lack of tests as a gap.
+Authentication was the most difficult part. The portal returned `403` responses even when the credentials and form payload matched the browser's request. Adding browser-like `Origin`, `Referer`, and `User-Agent` headers resolved the issue in testing.
+
+The adapter also needs to maintain the portal session cookie and recover from authentication failures. The client retries a request once after reauthentication, rather than retrying indefinitely.
+
+## What did you implement?
+
+- An Express REST API for meter search, individual meter details, consumption history, and transformer listings.
+- A separate portal client that owns authentication and upstream HTTP requests.
+- Environment-based configuration for the server port, portal URL, credentials, and request timeout.
+- Normalization of numeric readings and timestamps.
+- Centralized JSON error handling.
+- OpenAPI documentation and an interactive Swagger UI.
+- Automated unit tests for numeric and timestamp normalization.
+
+## What remains incomplete?
+
+- **Caching:** repeated requests can fetch the same data from the portal again.
+- **Geolocation:** the portal exposes a meter geolocation endpoint, but this API does not expose it.
+- **Network hierarchy:** the complete Zone-to-transformer hierarchy is not reconstructed by this API.
+- **Integration tests:** the current automated tests focus on normalization helpers. They do not comprehensively test the Express routes, session handling, or failure behavior against a mocked portal.
+- **Timezone verification:** the UTC interpretation of portal timestamps needs confirmation against the portal's displayed timezone.
+- **Caller authentication:** portal credentials authenticate this service to the upstream portal; they do not authenticate clients calling this API. Additional access controls are needed before exposing it publicly.
+
+## What would you improve with another day?
+
+I would first add integration tests with a mocked upstream portal. They should cover successful requests, missing credentials, invalid page numbers, unknown meter IDs, upstream errors, and session reauthentication.
+
+Next, I would add carefully bounded caching for data that does not need to be fetched on every request. I would also evaluate exposing the geolocation endpoint and reconstructing the network hierarchy, while documenting the reliability and maintenance costs of scraping server-rendered pages.
+
+## What would you criticize in this submission?
+
+The solution prioritizes a small, documented API and isolates the legacy portal integration, but its test coverage is still limited. The live portal is an external dependency, and its authentication behavior and response formats may change. More mocked integration tests, explicit caller authentication, and clearer operational logging would improve reliability and maintainability.
